@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>桌遊揪團</title>
+<style>
+  :root{
+    --bg:#f6f4ef; --card:#ffffff; --ink:#2b2620; --sub:#6f675c;
+    --accent:#b4531f; --accent-soft:#f3e0d3; --line:#e5dfd5;
+    --ok:#2e7d4f; --ok-soft:#ddefe4; --bad:#b3382e; --bad-soft:#f5dedc;
+    --wait:#8a6d1f; --wait-soft:#f3ecd2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:"PingFang TC","Microsoft JhengHei",system-ui,sans-serif}
+  /* 卡坦島風格六角地形磚背景 */
+  body{
+    color:var(--ink);min-height:100vh;
+    background-color:#efe9db;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='104' height='90' viewBox='0 0 104 90'%3E%3Crect width='104' height='90' fill='%23efe9db'/%3E%3Cg stroke='%23d9cdad' stroke-width='2'%3E%3Cpolygon points='0,-30 26,-15 26,15 0,30 -26,15 -26,-15' fill='%23eadfba'/%3E%3Cpolygon points='52,-30 78,-15 78,15 52,30 26,15 26,-15' fill='%23ccd8bd'/%3E%3Cpolygon points='104,-30 130,-15 130,15 104,30 78,15 78,-15' fill='%23eadfba'/%3E%3Cpolygon points='26,15 52,30 52,60 26,75 0,60 0,30' fill='%23e4cbb4'/%3E%3Cpolygon points='78,15 104,30 104,60 78,75 52,60 52,30' fill='%23cfdbd8'/%3E%3Cpolygon points='-26,15 0,30 0,60 -26,75 -52,60 -52,30' fill='%23cfdbd8'/%3E%3Cpolygon points='130,15 156,30 156,60 130,75 104,60 104,30' fill='%23e4cbb4'/%3E%3Cpolygon points='0,60 26,75 26,105 0,120 -26,105 -26,75' fill='%23eadfba'/%3E%3Cpolygon points='52,60 78,75 78,105 52,120 26,105 26,75' fill='%23ccd8bd'/%3E%3Cpolygon points='104,60 130,75 130,105 104,120 78,105 78,75' fill='%23eadfba'/%3E%3C/g%3E%3Ccircle cx='26' cy='45' r='7.5' fill='%23f6efdc' stroke='%23c9b98f' stroke-width='1.5'/%3E%3Ccircle cx='78' cy='45' r='7.5' fill='%23f6efdc' stroke='%23c9b98f' stroke-width='1.5'/%3E%3C/svg%3E");
+  }
+  header{background:rgba(255,253,247,.88);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:10}
+  header h1{font-size:20px;color:var(--accent)}
+  nav{display:flex;gap:6px;flex-wrap:wrap}
+  nav button{border:1px solid var(--line);background:transparent;padding:7px 14px;border-radius:20px;cursor:pointer;font-size:14px;color:var(--ink)}
+  nav button.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  #userBox{margin-left:auto;font-size:14px;color:var(--sub);display:flex;align-items:center;gap:10px}
+  main{max-width:860px;margin:24px auto;padding:0 16px}
+  .card{background:rgba(255,253,248,.92);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(90,70,40,.08)}
+  .card h2{font-size:17px;margin-bottom:14px}
+  label{display:block;font-size:13px;color:var(--sub);margin:10px 0 4px}
+  input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff}
+  textarea{resize:vertical;min-height:70px}
+  .btn{display:inline-block;margin-top:14px;background:var(--accent);color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:14px;cursor:pointer}
+  .btn:disabled{opacity:.5;cursor:wait}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+  .btn.sm{padding:6px 14px;font-size:13px;margin-top:8px}
+  .badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600}
+  .b-wait{background:var(--wait-soft);color:var(--wait)}
+  .b-ok{background:var(--ok-soft);color:var(--ok)}
+  .b-bad{background:var(--bad-soft);color:var(--bad)}
+  .ev-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+  .ev-title{font-size:16px;font-weight:700}
+  .meta{font-size:13px;color:var(--sub);margin-top:6px;line-height:1.8}
+  .members{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}
+  .chip{background:var(--accent-soft);color:var(--accent);padding:3px 10px;border-radius:12px;font-size:12px}
+  .chip.host{outline:1.5px solid var(--accent)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+  @media(max-width:560px){.row{grid-template-columns:1fr}}
+  .datebar{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  .datebar input{width:auto}
+  .stars{color:#c9a227;letter-spacing:2px}
+  .review{border-top:1px dashed var(--line);padding:10px 0;font-size:14px}
+  .review .who{color:var(--sub);font-size:12px}
+  .neg-reason{color:var(--bad);font-size:13px;margin-top:4px}
+  .score-big{font-size:34px;font-weight:800;color:var(--accent)}
+  .empty{color:var(--sub);font-size:14px;text-align:center;padding:30px 0}
+  .notice{background:var(--wait-soft);color:var(--wait);border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px}
+  .rate-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px dashed var(--line);padding:10px 0}
+  .rate-row select{width:auto}
+  .rate-row .name{min-width:90px;font-size:14px}
+  dialog{border:none;border-radius:12px;padding:22px;max-width:420px;width:92%}
+  dialog::backdrop{background:rgba(0,0,0,.35)}
+  .admin-tbl{width:100%;border-collapse:collapse;font-size:13px}
+  .admin-tbl th,.admin-tbl td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;white-space:nowrap}
+  .admin-tbl th{color:var(--sub);font-weight:600;background:var(--bg)}
+  .cmt-toggle{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;margin-top:10px;padding:0}
+  .cmt-box{border-top:1px dashed var(--line);margin-top:10px;padding-top:6px}
+  .cmt{padding:7px 0;font-size:14px}
+  .cmt .who{font-size:12px;color:var(--sub)}
+  .cmt.reply{margin-left:26px;border-left:2px solid var(--accent-soft);padding-left:10px}
+  .cmt-form{display:flex;gap:8px;margin-top:8px}
+  .cmt-form input{flex:1}
+  .cmt-form .btn{margin-top:0;padding:8px 16px}
+  .reply-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;margin-left:8px}
+  .loading{color:var(--sub);text-align:center;padding:50px 0;font-size:14px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎲 桌遊揪團</h1>
+  <nav id="nav"></nav>
+  <div id="userBox"></div>
+</header>
+<main id="app"></main>
+
+<dialog id="reasonDlg">
+  <h2 style="font-size:16px;margin-bottom:10px">負評理由(必填)</h2>
+  <p style="font-size:13px;color:var(--sub)">你給了 <span id="dlgTarget"></span> <span id="dlgStars"></span> 星,請說明理由:</p>
+  <textarea id="dlgReason" placeholder="例如:遲到超過 30 分鐘未告知…"></textarea>
+  <div style="display:flex;gap:10px;justify-content:flex-end">
+    <button class="btn ghost" onclick="closeDlg()">取消</button>
+    <button class="btn" onclick="confirmNeg()">送出評價</button>
+  </div>
+</dialog>
+
+<script>
+/* ================== 設定(部署時要改這裡) ================== */
+const API_URL   = 'https://script.google.com/macros/s/AKfycbwrHlZc1bNdE9CNeXBsAqfeoQoGMGFPc8Ux6kX03ZvGDZTZ8YmRGzygchWYggXVxlizYA/exec';
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/11ID3w_pIgSquT71B4AIK0WkIcJ8zYC6pBHz2asWYlm0/edit';
+const ADMIN_EMAIL = 'kalvin7775@gmail.com';      // 只有此 Email 看得到「會員管理」頁
+/* ========================================================== */
+
+const SES='bg_meetup_session_v1';
+let PROFILE=null; try{ PROFILE=JSON.parse(localStorage.getItem(SES)) }catch(e){}
+let DB={users:[],events:[],ratings:[],comments:[],friends:[]};
+let loading=false, loaded=false, loadError='', busy=false;
+
+const configured = () => API_URL.indexOf('http') === 0;
+
+/* ====== 工具 ====== */
+const $=s=>document.querySelector(s);
+const fmt=iso=>{ const d=new Date(iso); if(isNaN(d)) return String(iso);
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+const userById=id=>DB.users.find(u=>u.id===id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function me(){
+  if(!PROFILE) return null;
+  const u=userById(PROFILE.id);
+  return u ? Object.assign({},PROFILE,{score:u.score}) : PROFILE;
+}
+const isAdmin=()=>{const u=me();return !!u&&u.email.toLowerCase()===ADMIN_EMAIL.toLowerCase();};
+const statusBadge=ev=>({open:'<span class="badge b-wait">揪團中</span>',
+  confirmed:'<span class="badge b-ok">已成團</span>',
+  failed:'<span class="badge b-bad">流團</span>'}[ev.status]||'');
+
+/* ====== API 層 ====== */
+async function api(action,payload){
+  if(busy) throw new Error('busy');
+  busy=true;
+  try{
+    const res=await fetch(API_URL,{method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action,payload})});
+    const d=await res.json();
+    if(d.error){ alert(d.error); throw new Error(d.error); }
+    return d;
+  }finally{ busy=false; }
+}
+async function loadAll(){
+  if(!configured()) { render(); return; }
+  loading=true; loadError=''; render();
+  try{
+    const res=await fetch(API_URL);
+    DB=await res.json();
+  }catch(e){ loadError='無法連線到後端,請稍後再試或按重新整理。'; }
+  loading=false; loaded=true; render();
+}
+
+/* ====== 導覽 ====== */
+let page='home';
+const PAGES=()=>{const p={home:'揪團列表',create:'我要開團',rate:'評價',friends:'好友',profile:'我的資料'};
+  if(isAdmin()) p.admin='會員管理'; return p;};
+
+/* ====== 好友工具 ====== */
+const myFriendRows=()=>{const u=me();return u?(DB.friends||[]).filter(f=>f.userA===u.id||f.userB===u.id):[];};
+const friendIds=()=>{const u=me();return myFriendRows().filter(f=>f.status==='accepted')
+  .map(f=>f.userA===u.id?f.userB:f.userA);};
+const pendingIncoming=()=>{const u=me();return myFriendRows()
+  .filter(f=>f.status==='pending'&&f.requestedBy!==u.id);};
+const relationWith=id=>{const u=me();return myFriendRows()
+  .find(f=>f.userA===id||f.userB===id);};
+function go(p){ page=p; render(); }
+
+function render(){
+  const pages=PAGES();
+  if(!pages[page]) page='home';
+  const pin=me()?pendingIncoming().length:0;
+  $('#nav').innerHTML=Object.entries(pages)
+    .map(([k,v])=>`<button class="${page===k?'active':''}" onclick="go('${k}')">${k==='friends'&&pin?v+'('+pin+')':v}</button>`).join('')
+    +`<button title="重新整理資料" onclick="loadAll()">🔄</button>`;
+  const u=me();
+  $('#userBox').innerHTML=u
+    ? `<span>${esc(u.nick)}|積分 <b style="color:var(--accent)">${u.score}</b></span><button class="btn ghost sm" style="margin:0" onclick="logout()">登出</button>`
+    : `<span>未登入</span>`;
+  if(!configured()){ $('#app').innerHTML=renderSetup(); return; }
+  if(loading && !loaded){ $('#app').innerHTML='<div class="loading">🎲 資料載入中…</div>'; return; }
+  if(loadError && !DB.users.length){ $('#app').innerHTML=`<div class="notice">${loadError}</div>`; return; }
+  const fn={home:renderHome,create:renderCreate,rate:renderRate,friends:renderFriends,profile:renderProfile,admin:renderAdmin}[page];
+  $('#app').innerHTML = (u||page==='home') ? fn() : renderAuth();
+}
+
+function renderSetup(){
+  return `<div class="card"><h2>⚙️ 尚未完成設定</h2>
+    <div class="meta">此網頁還沒連上後端。請依「部署教學」完成 Google Apps Script 部署,
+    並把取得的網址填入本檔案開頭的 <b>API_URL</b>。</div></div>`;
+}
+
+/* ====== 註冊/登入 ====== */
+function renderAuth(){
+  return `<div class="card"><h2>登入</h2>
+    <div class="row">
+      <div><label>Email</label><input id="li_email" placeholder="you@example.com"></div>
+      <div><label>密碼</label><input id="li_pw" type="password"></div>
+    </div>
+    <button class="btn" onclick="doLogin()">登入</button></div>
+  <div class="card"><h2>註冊新會員(初始積分 60)</h2>
+    <div class="notice">真實姓名、電話與 Email 僅供管理員聯絡使用,不會公開;其他會員只看得到你的暱稱與積分。一個 Email 限申請一個會員。密碼供管理員核對身分用,請勿使用與其他網站相同的密碼。</div>
+    <div class="row">
+      <div><label>暱稱 *(不可與他人重複)</label><input id="rg_nick"></div>
+      <div><label>真實姓名 *</label><input id="rg_name"></div>
+      <div><label>性別 *</label><select id="rg_gender">
+        <option value="">請選擇</option><option value="男">男</option><option value="女">女</option></select></div>
+      <div><label>電話 *</label><input id="rg_phone" placeholder="09xx-xxx-xxx"></div>
+      <div><label>Email *</label><input id="rg_email"></div>
+      <div><label>密碼 *(至少 4 個字元)</label><input id="rg_pw" type="password"></div>
+    </div>
+    <button class="btn" onclick="doRegister()">註冊並登入</button></div>`;
+}
+async function doLogin(){
+  const em=$('#li_email').value.trim(), pw=$('#li_pw').value;
+  if(!em||!pw) return alert('請輸入 Email 與密碼');
+  try{
+    const d=await api('login',{email:em,password:pw});
+    PROFILE=d.profile; localStorage.setItem(SES,JSON.stringify(PROFILE));
+    await loadAll();
+  }catch(e){}
+}
+async function doRegister(){
+  const p={nick:$('#rg_nick').value.trim(), name:$('#rg_name').value.trim(),
+           gender:$('#rg_gender').value, password:$('#rg_pw').value,
+           phone:$('#rg_phone').value.trim(), email:$('#rg_email').value.trim()};
+  if(!p.nick||!p.name||!p.gender||!p.phone||!p.email||!p.password) return alert('所有欄位皆為必填');
+  if(p.password.length<4) return alert('密碼至少 4 個字元');
+  if(DB.users.some(u=>u.nick.trim().toLowerCase()===p.nick.toLowerCase())) return alert('此暱稱已有人使用,請換一個');
+  try{
+    const d=await api('register',p);
+    PROFILE=d.profile; localStorage.setItem(SES,JSON.stringify(PROFILE));
+    await loadAll();
+  }catch(e){}
+}
+function logout(){ PROFILE=null; localStorage.removeItem(SES); go('home'); }
+
+/* ====== 揪團列表 ====== */
+let filterDate='', filterRegion='';
+function renderHome(){
+  const u=me();
+  let evs=[...DB.events].sort((a,b)=>new Date(a.time)-new Date(b.time));
+  if(filterRegion) evs=evs.filter(e=>e.region===filterRegion);
+  if(filterDate) evs=evs.filter(e=>{
+    const d=new Date(e.time);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    return key===filterDate;
+  });
+  const list=evs.length?evs.map(ev=>{
+    const joined=u&&ev.members.includes(u.id);
+    const full=ev.members.length>=ev.maxPeople;
+    let action='';
+    if(u&&ev.status==='open'){
+      if(joined&&ev.hostId!==u.id) action=`<button class="btn ghost sm" onclick="leaveEv('${ev.id}',0)">取消報名</button>`;
+      else if(!joined&&!full) action=`<button class="btn sm" onclick="joinEv('${ev.id}')">報名參加</button>`;
+      else if(!joined&&full) action=`<span class="badge b-bad">已額滿</span>`;
+    }else if(u&&ev.status==='confirmed'&&joined&&ev.hostId!==u.id&&new Date(ev.time).getTime()>Date.now()){
+      action=`<button class="btn ghost sm" onclick="leaveEv('${ev.id}',1)">取消報名(扣10分)</button>`;
+    }
+    return `<div class="card">
+      <div class="ev-head"><div>
+        <div class="ev-title">${esc(ev.title)} ${statusBadge(ev)}</div>
+        <div class="meta">🕒 ${fmt(ev.time)}(報名截止 ${fmt(ev.deadline)})<br>
+        📍 ${ev.region?`<b>[${esc(ev.region)}]</b> `:''}${esc(ev.place)} 🎮 ${esc(ev.games)}<br>
+        🎓 教學:${esc(ev.teaching||'—')} 💰 費用:${ev.fee>0?ev.fee+' 元':'免費'}<br>
+        👥 ${ev.members.length}/${ev.maxPeople} 人(最低 ${ev.minPeople} 人成團)</div>
+      </div><div>${action}</div></div>
+      <div class="members">${ev.members.map(id=>{const m=userById(id);
+        return m?`<span class="chip ${id===ev.hostId?'host':''}">${esc(m.nick)} ${m.score}分${id===ev.hostId?' 👑':''}</span>`:''}).join('')}</div>
+      ${renderComments(ev)}
+    </div>`;
+  }).join(''):`<div class="empty">目前${filterDate?'這天':''}沒有揪團${filterDate?'':',快去開一團吧!'}</div>`;
+  let friendNotice='';
+  if(u){
+    const fids=friendIds();
+    let seen=[]; try{seen=JSON.parse(localStorage.getItem('bg_seen_fev'))||[]}catch(e){}
+    const fresh=DB.events.filter(ev=>ev.status==='open'&&fids.includes(ev.hostId)
+      &&!ev.members.includes(u.id)&&!seen.includes(ev.id));
+    if(fresh.length){
+      friendNotice=fresh.map(ev=>{const h=userById(ev.hostId);
+        return `<div class="notice">🔔 好友 <b>${esc(h?h.nick:'?')}</b> 開了新團「${esc(ev.title)}」(${fmt(ev.time)})
+        <button class="btn ghost sm" style="margin:0 0 0 8px" onclick="dismissFev('${ev.id}')">知道了</button></div>`;
+      }).join('');
+    }
+  }
+  const regionBtns=['','北部','中部','南部','東部'].map(r=>
+    `<button class="btn ${filterRegion===r?'':'ghost'} sm" style="margin:0" onclick="filterRegion='${r}';render()">${r||'全部區域'}</button>`).join('');
+  return `<div class="datebar">${regionBtns}</div>
+    <div class="datebar"><label style="margin:0">依日期篩選:</label>
+    <input type="date" value="${filterDate}" onchange="filterDate=this.value;render()">
+    <button class="btn ghost sm" style="margin:0" onclick="filterDate='';render()">全部日期</button></div>
+    ${u?'':'<div class="notice">瀏覽不用登入;報名或開團請先登入/註冊(點上方任一功能即可)。</div>'}${friendNotice}${loadError?`<div class="notice">${loadError}</div>`:''}${list}`;
+}
+function dismissFev(id){
+  let seen=[]; try{seen=JSON.parse(localStorage.getItem('bg_seen_fev'))||[]}catch(e){}
+  if(!seen.includes(id)) seen.push(id);
+  localStorage.setItem('bg_seen_fev',JSON.stringify(seen.slice(-200)));
+  render();
+}
+async function joinEv(id){ try{ await api('join',{eventId:id,userId:PROFILE.id}); await loadAll(); }catch(e){} }
+async function leaveEv(id,penalty){
+  if(penalty&&!confirm('此團已成團,現在取消將扣除 10 分積分,確定要取消嗎?')) return;
+  try{ await api('leave',{eventId:id,userId:PROFILE.id}); await loadAll(); }catch(e){}
+}
+
+/* ====== 留言與回覆 ====== */
+let openCmts={}, replyTo=null;
+function renderComments(ev){
+  const u=me();
+  const all=DB.comments.filter(c=>c.eventId===ev.id).sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+  const tops=all.filter(c=>!c.parentId);
+  if(!openCmts[ev.id])
+    return `<button class="cmt-toggle" onclick="openCmts['${ev.id}']=1;render()">💬 留言(${all.length})</button>`;
+  const form=(parentId)=>u?`<div class="cmt-form">
+      <input id="ci_${ev.id}_${parentId||'top'}" placeholder="${parentId?'回覆…':'留言…'}" maxlength="300"
+        onkeydown="if(event.key==='Enter')addComment('${ev.id}',${parentId?`'${parentId}'`:'null'})">
+      <button class="btn sm" style="margin:0" onclick="addComment('${ev.id}',${parentId?`'${parentId}'`:'null'})">送出</button>
+    </div>`:'';
+  const one=c=>{const m=userById(c.userId);
+    return `<div class="cmt ${c.parentId?'reply':''}">
+      <span class="who">${esc(m?m.nick:'?')}.${fmt(c.at)}</span>
+      ${u&&!c.parentId?`<button class="reply-btn" onclick="replyTo=${replyTo&&replyTo.parentId===c.id?'null':`{evId:'${ev.id}',parentId:'${c.id}'}`};render()">回覆</button>`:''}
+      <div>${esc(c.text)}</div>
+      ${replyTo&&replyTo.parentId===c.id?form(c.id):''}
+    </div>`;};
+  const thread=tops.map(t=>one(t)+all.filter(c=>c.parentId===t.id).map(one).join('')).join('')
+    ||'<div class="cmt" style="color:var(--sub)">還沒有留言</div>';
+  return `<div class="cmt-box">
+    <button class="cmt-toggle" style="margin:0 0 4px" onclick="delete openCmts['${ev.id}'];replyTo=null;render()">收合留言 ▲</button>
+    ${thread}${u?form(null):'<div class="cmt" style="color:var(--sub);font-size:12px">登入後即可留言</div>'}</div>`;
+}
+async function addComment(evId,parentId){
+  const inp=document.getElementById(`ci_${evId}_${parentId||'top'}`);
+  const text=inp.value.trim();
+  if(!text) return;
+  try{
+    await api('comment',{eventId:evId,userId:PROFILE.id,parentId:parentId||null,text});
+    replyTo=null; await loadAll();
+  }catch(e){}
+}
+
+/* ====== 好友 ====== */
+function renderFriends(){
+  const u=me();
+  const fids=friendIds();
+  const incoming=pendingIncoming().map(f=>{
+    const other=userById(f.userA===u.id?f.userB:f.userA);
+    return `<div class="rate-row"><span class="name">${esc(other?other.nick:'?')}</span>
+      <button class="btn sm" style="margin:0" onclick="friendAct('friendAccept','${f.id}')">接受</button>
+      <button class="btn ghost sm" style="margin:0" onclick="friendAct('friendRemove','${f.id}')">拒絕</button></div>`;
+  }).join('')||'<div class="empty">沒有待處理的邀請</div>';
+  const list=fids.map(id=>{
+    const m=userById(id); if(!m) return '';
+    const f=relationWith(id);
+    return `<div class="rate-row"><span class="name">${esc(m.nick)}${m.gender?'('+esc(m.gender)+')':''}</span>
+      <span style="font-size:12px;color:var(--sub)">積分 ${m.score}</span>
+      <button class="btn ghost sm" style="margin:0" onclick="if(confirm('確定刪除好友 ${esc(m.nick)}?'))friendAct('friendRemove','${f.id}')">刪除</button></div>`;
+  }).join('')||'<div class="empty">還沒有好友,從下方名單加好友吧</div>';
+  const others=DB.users.filter(x=>x.id!==u.id).map(m=>{
+    const rel=relationWith(m.id);
+    let act;
+    if(!rel) act=`<button class="btn sm" style="margin:0" onclick="sendFriendReq('${m.id}')">加好友</button>`;
+    else if(rel.status==='accepted') act='<span style="font-size:12px;color:var(--ok)">✓ 已是好友</span>';
+    else if(rel.requestedBy===u.id) act='<span style="font-size:12px;color:var(--sub)">邀請已送出</span>';
+    else act='<span style="font-size:12px;color:var(--wait)">待你回覆(見上方)</span>';
+    return `<div class="rate-row"><span class="name">${esc(m.nick)}${m.gender?'('+esc(m.gender)+')':''}</span>
+      <span style="font-size:12px;color:var(--sub)">積分 ${m.score}</span>${act}</div>`;
+  }).join('')||'<div class="empty">目前沒有其他會員</div>';
+  const fevs=DB.events.filter(ev=>ev.status==='open'&&fids.includes(ev.hostId)&&!ev.members.includes(u.id));
+  const fevList=fevs.map(ev=>{
+    const h=userById(ev.hostId);
+    return `<div class="rate-row"><span>🔔 <b>${esc(h?h.nick:'?')}</b> 開了「${esc(ev.title)}」.${fmt(ev.time)}</span>
+      <button class="btn sm" style="margin:0" onclick="go('home')">去看看</button></div>`;
+  }).join('')||'<div class="empty">好友目前沒有開放中的揪團</div>';
+  return `<div class="card"><h2>好友邀請</h2>${incoming}</div>
+    <div class="card"><h2>我的好友(${fids.length})</h2>${list}</div>
+    <div class="card"><h2>好友的揪團</h2>${fevList}</div>
+    <div class="card"><h2>尋找會員</h2>${others}</div>`;
+}
+async function sendFriendReq(toId){
+  try{ await api('friendRequest',{fromId:PROFILE.id,toId}); await loadAll(); }catch(e){}
+}
+async function friendAct(action,friendId){
+  try{ await api(action,{friendId,userId:PROFILE.id}); await loadAll(); }catch(e){}
+}
+
+/* ====== 開團 ====== */
+function renderCreate(){
+  return `<div class="card"><h2>我要開團</h2>
+    <label>揪團標題 *</label><input id="c_title" placeholder="週五晚上輕策桌遊團">
+    <div class="row">
+      <div><label>活動時間 *</label><input id="c_time" type="datetime-local"></div>
+      <div><label>報名截止時間 *(截止時自動判定成團/流團)</label><input id="c_deadline" type="datetime-local"></div>
+      <div><label>區域 *</label><select id="c_region">
+        <option value="">請選擇</option><option>北部</option><option>中部</option><option>南部</option><option>東部</option></select></div>
+      <div><label>詳細地點 *</label><input id="c_place" placeholder="台北車站 XX 桌遊店"></div>
+      <div><label>預計玩的遊戲 *</label><input id="c_games" placeholder="卡坦島、璀璨寶石"></div>
+      <div><label>是否提供教學 *</label><select id="c_teaching">
+        <option value="">請選擇</option><option>有</option><option>無</option></select></div>
+      <div><label>費用 *(免費請填 0)</label><input id="c_fee" type="number" min="0" value="0"></div>
+      <div><label>最低成團人數 *</label><input id="c_min" type="number" min="2" value="3"></div>
+      <div><label>人數上限 *</label><input id="c_max" type="number" min="2" value="6"></div>
+    </div>
+    <button class="btn" onclick="doCreate()">發布揪團</button></div>`;
+}
+async function doCreate(){
+  const p={title:$('#c_title').value.trim(), time:$('#c_time').value, deadline:$('#c_deadline').value,
+        region:$('#c_region').value, place:$('#c_place').value.trim(), games:$('#c_games').value.trim(),
+        teaching:$('#c_teaching').value, fee:+$('#c_fee').value||0,
+        minPeople:+$('#c_min').value, maxPeople:+$('#c_max').value, hostId:PROFILE.id};
+  if(!p.title||!p.time||!p.deadline||!p.region||!p.place||!p.games||!p.teaching||!p.minPeople||!p.maxPeople) return alert('所有欄位皆為必填');
+  if(!(p.fee>=0)) return alert('費用請填 0 或正整數');
+  if(new Date(p.deadline)>new Date(p.time)) return alert('截止時間不可晚於活動時間');
+  if(p.minPeople>p.maxPeople) return alert('最低成團人數不可大於上限');
+  try{ await api('createEvent',p); page='home'; await loadAll(); }catch(e){}
+}
+
+/* ====== 評價 ====== */
+let pendingNeg=null;
+function ratableEvents(){
+  const u=me(); if(!u) return [];
+  return DB.events.filter(ev=>ev.status==='confirmed'
+    && new Date(ev.time).getTime()<Date.now()
+    && ev.members.includes(u.id));
+}
+function renderRate(){
+  const u=me();
+  const evs=ratableEvents();
+  if(!evs.length) return `<div class="card"><h2>評價團員</h2>
+    <div class="empty">目前沒有可評價的活動。<br>活動需「已成團」且活動時間已結束,團員才能互評。</div></div>`;
+  return evs.map(ev=>{
+    const rows=ev.members.filter(id=>id!==u.id).map(id=>{
+      const m=userById(id); if(!m) return '';
+      const done=DB.ratings.find(r=>r.eventId===ev.id&&r.fromId===u.id&&r.toId===id);
+      if(done) return `<div class="rate-row"><span class="name">${esc(m.nick)}</span>
+        <span class="stars">${'★'.repeat(done.stars)}${'☆'.repeat(5-done.stars)}</span>
+        <span style="font-size:12px;color:var(--sub)">已評價</span></div>`;
+      return `<div class="rate-row"><span class="name">${esc(m.nick)}</span>
+        <select id="st_${ev.id}_${id}">
+          <option value="5">★★★★★</option><option value="4">★★★★</option>
+          <option value="3" selected>★★★</option><option value="2">★★(負評)</option>
+          <option value="1">★(負評)</option></select>
+        <button class="btn sm" style="margin:0" onclick="submitRating('${ev.id}','${id}')">送出</button></div>`;
+    }).join('');
+    return `<div class="card"><h2>${esc(ev.title)} <span class="badge b-ok">已成團</span></h2>
+      <div class="meta">🕒 ${fmt(ev.time)} 📍 ${esc(ev.place)}</div>${rows}</div>`;
+  }).join('');
+}
+function submitRating(evId,toId){
+  const stars=+document.getElementById(`st_${evId}_${toId}`).value;
+  if(stars<=2){
+    pendingNeg={evId,toId,stars};
+    $('#dlgTarget').textContent=userById(toId).nick;
+    $('#dlgStars').textContent=stars;
+    $('#dlgReason').value='';
+    $('#reasonDlg').showModal();
+    return;
+  }
+  saveRating(evId,toId,stars,'');
+}
+function confirmNeg(){
+  const reason=$('#dlgReason').value.trim();
+  if(!reason) return alert('負評必須填寫理由');
+  const {evId,toId,stars}=pendingNeg;
+  $('#reasonDlg').close();
+  saveRating(evId,toId,stars,reason);
+}
+function closeDlg(){ $('#reasonDlg').close(); pendingNeg=null; }
+async function saveRating(evId,toId,stars,reason){
+  try{
+    await api('rate',{eventId:evId,fromId:PROFILE.id,toId,stars,reason});
+    await loadAll();
+  }catch(e){}
+}
+
+/* ====== 我的資料 ====== */
+function renderProfile(){
+  const u=me();
+  const got=DB.ratings.filter(r=>r.toId===u.id);
+  const avg=got.length?(got.reduce((s,r)=>s+r.stars,0)/got.length).toFixed(1):'—';
+  const reviews=got.length?got.map(r=>{
+    const ev=DB.events.find(e=>e.id===r.eventId);
+    const from=userById(r.fromId);
+    return `<div class="review">
+      <span class="stars">${'★'.repeat(r.stars)}${'☆'.repeat(5-r.stars)}</span>
+      <span class="who"> 來自 ${esc(from?from.nick:'?')}.${ev?esc(ev.title):''}</span>
+      ${r.reason?`<div class="neg-reason">理由:${esc(r.reason)}</div>`:''}
+    </div>`}).join(''):'<div class="empty">尚無收到評價</div>';
+  return `<div class="card"><h2>我的資料</h2>
+    <div style="display:flex;gap:30px;align-items:center;flex-wrap:wrap">
+      <div><div class="score-big">${u.score}</div><div style="font-size:12px;color:var(--sub)">目前積分</div></div>
+      <div class="meta">暱稱:${esc(u.nick)}<br>姓名:${esc(u.name)}<br>性別:${esc(u.gender||'—')}<br>電話:${esc(u.phone)}<br>Email:${esc(u.email)}<br>平均星等:${avg}(${got.length} 則評價)<br>好友數:${friendIds().length}</div>
+    </div></div>
+    <div class="card"><h2>收到的評價</h2>${reviews}</div>
+    <div class="card"><h2>📮 留言給版主</h2>
+      <div class="meta">有任何問題、建議或檢舉,都可以留言給版主(只有版主看得到)。</div>
+      <textarea id="msg_admin" placeholder="想對版主說…" maxlength="500"></textarea>
+      <button class="btn" onclick="sendAdminMsg()">送出留言</button></div>`;
+}
+async function sendAdminMsg(){
+  const text=$('#msg_admin').value.trim();
+  if(!text) return alert('留言不可為空');
+  try{
+    await api('messageAdmin',{userId:PROFILE.id,text});
+    $('#msg_admin').value='';
+    alert('已送出,版主會盡快查看!');
+  }catch(e){}
+}
+
+/* ====== 會員管理(僅管理員) ====== */
+function renderAdmin(){
+  if(!isAdmin()) return '<div class="empty">無權限</div>';
+  const rows=DB.users.map(u=>{
+    const got=DB.ratings.filter(r=>r.toId===u.id);
+    const avg=got.length?(got.reduce((s,r)=>s+r.stars,0)/got.length).toFixed(1):'—';
+    const neg=got.filter(r=>r.stars<=2).length;
+    return `<tr><td>${esc(u.nick)}</td><td>${u.score}</td><td>${avg}</td><td>${neg}</td></tr>`;
+  }).join('');
+  const negList=DB.ratings.filter(r=>r.stars<=2).map(r=>{
+    const ev=DB.events.find(e=>e.id===r.eventId);
+    const f=userById(r.fromId), t=userById(r.toId);
+    return `<div class="review"><span class="stars">${'★'.repeat(r.stars)}${'☆'.repeat(5-r.stars)}</span>
+      <span class="who"> ${esc(f?f.nick:'?')} → ${esc(t?t.nick:'?')}.${ev?esc(ev.title):''}</span>
+      <div class="neg-reason">理由:${esc(r.reason)}</div></div>`;
+  }).join('')||'<div class="empty">尚無負評紀錄</div>';
+  // 統計:最常揪的區域與桌遊排名
+  const regCount={};
+  DB.events.forEach(ev=>{ if(ev.region) regCount[ev.region]=(regCount[ev.region]||0)+1; });
+  const regRows=['北部','中部','南部','東部'].filter(r=>regCount[r])
+    .sort((a,b)=>regCount[b]-regCount[a])
+    .map((r,i)=>`<tr><td>${i+1}</td><td>${r}</td><td>${regCount[r]} 團</td></tr>`).join('')
+    ||'<tr><td colspan="3" class="empty">尚無揪團資料</td></tr>';
+  const gameCount={};
+  DB.events.forEach(ev=>String(ev.games||'').split(/[、,，\/\s]+/).forEach(g=>{
+    g=g.trim(); if(g) gameCount[g]=(gameCount[g]||0)+1; }));
+  const gameRows=Object.entries(gameCount).sort((a,b)=>b[1]-a[1]).slice(0,10)
+    .map(([g,n],i)=>`<tr><td>${i+1}</td><td>${esc(g)}</td><td>${n} 次</td></tr>`).join('')
+    ||'<tr><td colspan="3" class="empty">尚無遊戲資料</td></tr>';
+  return `<div class="notice">會員的真實姓名、電話、Email、密碼存放在你的 Google 試算表(users 工作表);會員留言在 messages 工作表。皆不經過公開網頁,請直接開試算表查看。${SHEET_URL?`<a href="${SHEET_URL}" target="_blank">👉 開啟試算表</a>`:''}</div>
+    <div class="card"><h2>會員總覽(${DB.users.length} 人)</h2>
+    <div style="overflow-x:auto"><table class="admin-tbl">
+      <tr><th>暱稱</th><th>積分</th><th>平均星等</th><th>負評數</th></tr>
+      ${rows||'<tr><td colspan="4" class="empty">尚無會員</td></tr>'}</table></div></div>
+    <div class="card"><h2>📊 最常揪的區域</h2>
+    <table class="admin-tbl"><tr><th>#</th><th>區域</th><th>揪團數</th></tr>${regRows}</table></div>
+    <div class="card"><h2>🏆 桌遊排名(前 10)</h2>
+    <table class="admin-tbl"><tr><th>#</th><th>遊戲</th><th>被揪次數</th></tr>${gameRows}</table></div>
+    <div class="card"><h2>負評審核紀錄</h2>${negList}</div>`;
+}
+
+/* ====== 啟動 ====== */
+render();
+loadAll();
+</script>
+</body>
+</html>
