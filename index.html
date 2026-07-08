@@ -404,7 +404,15 @@ function renderFriends(){
       <button class="btn ghost sm" style="margin:0" onclick="if(confirm('確定刪除好友 ${esc(m.nick)}?'))friendAct('friendRemove','${f.id}')">刪除</button></div>`;
   }).join('')||'<div class="empty">還沒有好友,從下方名單加好友吧</div>';
   const fq=friendSearch.trim().toLowerCase();
-  const others=DB.users.filter(x=>x.id!==u.id&&(!fq||String(x.nick).toLowerCase().includes(fq))).map(m=>{
+  // 一起玩過的人:曾與你同團的其他會員(此清單只含你已知道存在的人,不會洩漏總會員數)
+  const playedWith=new Set();
+  DB.events.forEach(ev=>{ if(ev.members.includes(u.id)) ev.members.forEach(id=>{ if(id!==u.id) playedWith.add(id); }); });
+  // 有搜尋:依暱稱找特定人;沒搜尋:只列出一起玩過的人
+  const candidateIds = fq
+    ? DB.users.filter(x=>x.id!==u.id&&String(x.nick).toLowerCase().includes(fq)).map(x=>x.id)
+    : [...playedWith];
+  const others=candidateIds.map(id=>{
+    const m=userById(id); if(!m) return '';
     const rel=relationWith(m.id);
     let act;
     if(!rel) act=`<button class="btn sm" style="margin:0" onclick="sendFriendReq('${m.id}')">加好友</button>`;
@@ -414,7 +422,7 @@ function renderFriends(){
     return `<div class="rate-row"><span class="name">${esc(m.nick)}</span>
       <span style="font-size:12px;color:var(--sub)">積分 ${m.score}</span>
       <button class="btn ghost sm" style="margin:0" onclick="dmTo('${m.id}')">私訊</button>${act}</div>`;
-  }).join('')||`<div class="empty">${fq?'找不到符合的暱稱':'目前沒有其他會員'}</div>`;
+  }).join('')||`<div class="empty">${fq?'找不到符合的暱稱':'還沒有一起玩過的團員,可用上方搜尋暱稱找人加好友'}</div>`;
   const fevs=DB.events.filter(ev=>ev.status==='open'&&fids.includes(ev.hostId)&&!ev.members.includes(u.id));
   const fevList=fevs.map(ev=>{
     const h=userById(ev.hostId);
@@ -425,6 +433,7 @@ function renderFriends(){
     <div class="card"><h2>我的好友(${fids.length})</h2>${list}</div>
     <div class="card"><h2>好友的揪團</h2>${fevList}</div>
     <div class="card"><h2>尋找會員</h2>
+      <div class="notice" style="margin-bottom:10px">為保護會員隱私,這裡預設${fq?'':'只列出曾與你一起玩過的人。'}要找其他人,請直接輸入對方暱稱搜尋。</div>
       <input id="friend_search" class="keepfocus" placeholder="輸入暱稱搜尋…" value="${esc(friendSearch)}" oninput="friendSearch=this.value;render()" style="margin-bottom:12px">
       ${others}</div>`;
 }
