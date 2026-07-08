@@ -347,7 +347,7 @@ function renderFriends(){
   const list=fids.map(id=>{
     const m=userById(id); if(!m) return '';
     const f=relationWith(id);
-    return `<div class="rate-row"><span class="name">${esc(m.nick)}${m.gender?'('+esc(m.gender)+')':''}</span>
+    return `<div class="rate-row"><span class="name">${esc(m.nick)}</span>
       <span style="font-size:12px;color:var(--sub)">積分 ${m.score}</span>
       <button class="btn ghost sm" style="margin:0" onclick="if(confirm('確定刪除好友 ${esc(m.nick)}?'))friendAct('friendRemove','${f.id}')">刪除</button></div>`;
   }).join('')||'<div class="empty">還沒有好友,從下方名單加好友吧</div>';
@@ -358,7 +358,7 @@ function renderFriends(){
     else if(rel.status==='accepted') act='<span style="font-size:12px;color:var(--ok)">✓ 已是好友</span>';
     else if(rel.requestedBy===u.id) act='<span style="font-size:12px;color:var(--sub)">邀請已送出</span>';
     else act='<span style="font-size:12px;color:var(--wait)">待你回覆(見上方)</span>';
-    return `<div class="rate-row"><span class="name">${esc(m.nick)}${m.gender?'('+esc(m.gender)+')':''}</span>
+    return `<div class="rate-row"><span class="name">${esc(m.nick)}</span>
       <span style="font-size:12px;color:var(--sub)">積分 ${m.score}</span>${act}</div>`;
   }).join('')||'<div class="empty">目前沒有其他會員</div>';
   const fevs=DB.events.filter(ev=>ev.status==='open'&&fids.includes(ev.hostId)&&!ev.members.includes(u.id));
@@ -380,12 +380,33 @@ async function friendAct(action,friendId){
 }
 
 /* ====== 開團 ====== */
+/* 開團表單工具 */
+const pad2=n=>String(n).padStart(2,'0');
+const toLocalInput=d=>`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+function timeOptions(){
+  let s='';
+  for(let h=0;h<24;h++) for(const mm of ['00','30']){
+    const t=`${pad2(h)}:${mm}`;
+    s+=`<option value="${t}" ${t==='19:00'?'selected':''}>${t}</option>`;
+  }
+  return s;
+}
+function updateDeadline(){ // 自動帶入:活動前 12 小時(仍可手動調整)
+  const d=$('#c_date').value, t=$('#c_time_sel').value;
+  if(!d||!t) return;
+  const dt=new Date(`${d}T${t}`);
+  if(isNaN(dt)) return;
+  $('#c_deadline').value=toLocalInput(new Date(dt.getTime()-12*3600*1000));
+}
 function renderCreate(){
+  const today=new Date();
+  const todayStr=`${today.getFullYear()}-${pad2(today.getMonth()+1)}-${pad2(today.getDate())}`;
   return `<div class="card"><h2>我要開團</h2>
     <label>揪團標題 *</label><input id="c_title" placeholder="週五晚上輕策桌遊團">
     <div class="row">
-      <div><label>活動時間 *</label><input id="c_time" type="datetime-local"></div>
-      <div><label>報名截止時間 *(截止時自動判定成團/流團)</label><input id="c_deadline" type="datetime-local"></div>
+      <div><label>活動日期 *(只能選今天以後)</label><input id="c_date" type="date" min="${todayStr}" onchange="updateDeadline()"></div>
+      <div><label>活動時間 *(30 分鐘為單位)</label><select id="c_time_sel" onchange="updateDeadline()">${timeOptions()}</select></div>
+      <div><label>報名截止時間 *(自動設為活動前 12 小時,可手動調整)</label><input id="c_deadline" type="datetime-local"></div>
       <div><label>區域 *</label><select id="c_region">
         <option value="">請選擇</option><option>北部</option><option>中部</option><option>南部</option><option>東部</option></select></div>
       <div><label>詳細地點 *</label><input id="c_place" placeholder="台北車站 XX 桌遊店"></div>
@@ -399,11 +420,14 @@ function renderCreate(){
     <button class="btn" onclick="doCreate()">發布揪團</button></div>`;
 }
 async function doCreate(){
-  const p={title:$('#c_title').value.trim(), time:$('#c_time').value, deadline:$('#c_deadline').value,
+  const cd=$('#c_date').value, ct=$('#c_time_sel').value;
+  const p={title:$('#c_title').value.trim(), time:cd&&ct?`${cd}T${ct}`:'', deadline:$('#c_deadline').value,
         region:$('#c_region').value, place:$('#c_place').value.trim(), games:$('#c_games').value.trim(),
         teaching:$('#c_teaching').value, fee:+$('#c_fee').value||0,
         minPeople:+$('#c_min').value, maxPeople:+$('#c_max').value, hostId:PROFILE.id};
   if(!p.title||!p.time||!p.deadline||!p.region||!p.place||!p.games||!p.teaching||!p.minPeople||!p.maxPeople) return alert('所有欄位皆為必填');
+  if(new Date(p.time).getTime()<=Date.now()) return alert('活動時間必須是現在之後');
+  if(new Date(p.deadline).getTime()<=Date.now()) return alert('報名截止時間已過,請調整(活動太接近現在時,請手動設定截止時間)');
   if(!(p.fee>=0)) return alert('費用請填 0 或正整數');
   if(new Date(p.deadline)>new Date(p.time)) return alert('截止時間不可晚於活動時間');
   if(p.minPeople>p.maxPeople) return alert('最低成團人數不可大於上限');
@@ -421,9 +445,10 @@ function ratableEvents(){
 function renderRate(){
   const u=me();
   const evs=ratableEvents();
+  const ruleNote=`<div class="notice">評分規則:⭐-3分.⭐⭐-1分.⭐⭐⭐+1分.⭐⭐⭐⭐+3分.⭐⭐⭐⭐⭐+5分;1~2星需填理由;對同一位團員累計最多評 5 次。主揪每次成團另加 5 分。</div>`;
   if(!evs.length) return `<div class="card"><h2>評價團員</h2>
     <div class="empty">目前沒有可評價的活動。<br>活動需「已成團」且活動時間已結束,團員才能互評。</div></div>`;
-  return evs.map(ev=>{
+  return ruleNote+evs.map(ev=>{
     const rows=ev.members.filter(id=>id!==u.id).map(id=>{
       const m=userById(id); if(!m) return '';
       const done=DB.ratings.find(r=>r.eventId===ev.id&&r.fromId===u.id&&r.toId===id);
