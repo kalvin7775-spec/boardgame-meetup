@@ -136,20 +136,29 @@ async function api(action,payload){
     return d;
   }finally{ busy=false; }
 }
+async function postRaw(action,payload){
+  const res=await fetch(API_URL,{method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify({action,payload})});
+  return res.json();
+}
 async function loadAll(){
   if(!configured()) { render(); return; }
   loading=true; loadError=''; render();
   try{
     const res=await fetch(API_URL);
     DB=await res.json();
+    if(PROFILE){ try{ const d=await postRaw('getDMs',{userId:PROFILE.id}); DB.dms=d.list||[]; }catch(e){ DB.dms=DB.dms||[]; } }
   }catch(e){ loadError='無法連線到後端,請稍後再試或按重新整理。'; }
   loading=false; loaded=true; render();
 }
 
 /* ====== 導覽 ====== */
 let page='home';
-const PAGES=()=>{const p={home:'揪團列表',create:'我要開團',rate:'評價',friends:'好友',profile:'我的資料'};
+let dmWith=null, dmSearch='', friendSearch='';
+const PAGES=()=>{const p={home:'揪團列表',create:'我要開團',rate:'評價',friends:'好友',dm:'訊息',profile:'我的資料'};
   if(isAdmin()) p.admin='會員管理'; return p;};
+const dmUnread=()=>{const u=me();return u?(DB.dms||[]).filter(d=>d.toId===u.id&&!d.read).length:0;};
 
 /* ====== 好友工具 ====== */
 const myFriendRows=()=>{const u=me();return u?(DB.friends||[]).filter(f=>f.userA===u.id||f.userB===u.id):[];};
@@ -162,11 +171,18 @@ const relationWith=id=>{const u=me();return myFriendRows()
 function go(p){ page=p; render(); }
 
 function render(){
+  const active=document.activeElement;
+  const keepId=(active&&active.classList&&active.classList.contains('keepfocus'))?active.id:null;
+  const keepPos=keepId?active.selectionStart:null;
   const pages=PAGES();
   if(!pages[page]) page='home';
   const pin=me()?pendingIncoming().length:0;
+  const dun=me()?dmUnread():0;
   $('#nav').innerHTML=Object.entries(pages)
-    .map(([k,v])=>`<button class="${page===k?'active':''}" onclick="go('${k}')">${k==='friends'&&pin?v+'('+pin+')':v}</button>`).join('')
+    .map(([k,v])=>{let label=v;
+      if(k==='friends'&&pin) label=v+'('+pin+')';
+      if(k==='dm'&&dun) label=v+'('+dun+')';
+      return `<button class="${page===k?'active':''}" onclick="go('${k}')">${label}</button>`;}).join('')
     +`<button title="重新整理資料" onclick="loadAll()">🔄</button>`;
   const u=me();
   $('#userBox').innerHTML=u
@@ -175,8 +191,9 @@ function render(){
   if(!configured()){ $('#app').innerHTML=renderSetup(); return; }
   if(loading && !loaded){ $('#app').innerHTML='<div class="loading">🎲 資料載入中…</div>'; return; }
   if(loadError && !DB.users.length){ $('#app').innerHTML=`<div class="notice">${loadError}</div>`; return; }
-  const fn={home:renderHome,create:renderCreate,rate:renderRate,friends:renderFriends,profile:renderProfile,admin:renderAdmin}[page];
+  const fn={home:renderHome,create:renderCreate,rate:renderRate,friends:renderFriends,dm:renderDM,profile:renderProfile,admin:renderAdmin}[page];
   $('#app').innerHTML = (u||page==='home') ? fn() : renderAuth();
+  if(keepId){ const el=document.getElementById(keepId); if(el){ el.focus(); try{el.setSelectionRange(keepPos,keepPos);}catch(e){} } }
 }
 
 function renderSetup(){
@@ -379,9 +396,11 @@ function renderFriends(){
     const f=relationWith(id);
     return `<div class="rate-row"><span class="name">${esc(m.nick)}</span>
       <span style="font-size:12px;color:var(--sub)">積分 ${m.score}</span>
+      <button class="btn ghost sm" style="margin:0" onclick="dmTo('${m.id}')">私訊</button>
       <button class="btn ghost sm" style="margin:0" onclick="if(confirm('確定刪除好友 ${esc(m.nick)}?'))friendAct('friendRemove','${f.id}')">刪除</button></div>`;
   }).join('')||'<div class="empty">還沒有好友,從下方名單加好友吧</div>';
-  const others=DB.users.filter(x=>x.id!==u.id).map(m=>{
+  const fq=friendSearch.trim().toLowerCase();
+  const others=DB.users.filter(x=>x.id!==u.id&&(!fq||String(x.nick).toLowerCase().includes(fq))).map(m=>{
     const rel=relationWith(m.id);
     let act;
     if(!rel) act=`<button class="btn sm" style="margin:0" onclick="sendFriendReq('${m.id}')">加好友</button>`;
@@ -389,8 +408,9 @@ function renderFriends(){
     else if(rel.requestedBy===u.id) act='<span style="font-size:12px;color:var(--sub)">邀請已送出</span>';
     else act='<span style="font-size:12px;color:var(--wait)">待你回覆(見上方)</span>';
     return `<div class="rate-row"><span class="name">${esc(m.nick)}</span>
-      <span style="font-size:12px;color:var(--sub)">積分 ${m.score}</span>${act}</div>`;
-  }).join('')||'<div class="empty">目前沒有其他會員</div>';
+      <span style="font-size:12px;color:var(--sub)">積分 ${m.score}</span>
+      <button class="btn ghost sm" style="margin:0" onclick="dmTo('${m.id}')">私訊</button>${act}</div>`;
+  }).join('')||`<div class="empty">${fq?'找不到符合的暱稱':'目前沒有其他會員'}</div>`;
   const fevs=DB.events.filter(ev=>ev.status==='open'&&fids.includes(ev.hostId)&&!ev.members.includes(u.id));
   const fevList=fevs.map(ev=>{
     const h=userById(ev.hostId);
@@ -400,7 +420,9 @@ function renderFriends(){
   return `<div class="card"><h2>好友邀請</h2>${incoming}</div>
     <div class="card"><h2>我的好友(${fids.length})</h2>${list}</div>
     <div class="card"><h2>好友的揪團</h2>${fevList}</div>
-    <div class="card"><h2>尋找會員</h2>${others}</div>`;
+    <div class="card"><h2>尋找會員</h2>
+      <input id="friend_search" class="keepfocus" placeholder="輸入暱稱搜尋…" value="${esc(friendSearch)}" oninput="friendSearch=this.value;render()" style="margin-bottom:12px">
+      ${others}</div>`;
 }
 async function sendFriendReq(toId){
   try{ await api('friendRequest',{fromId:PROFILE.id,toId}); await loadAll(); }catch(e){}
@@ -408,6 +430,76 @@ async function sendFriendReq(toId){
 async function friendAct(action,friendId){
   try{ await api(action,{friendId,userId:PROFILE.id}); await loadAll(); }catch(e){}
 }
+
+/* ====== 私訊 ====== */
+function renderDM(){
+  const u=me();
+  const dms=(DB.dms||[]);
+  // 選定對話
+  let convCard='';
+  if(dmWith){
+    const m=userById(dmWith);
+    const msgs=dms.filter(d=>(d.fromId===u.id&&d.toId===dmWith)||(d.fromId===dmWith&&d.toId===u.id))
+      .sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+    const bubbles=msgs.length?msgs.map(d=>{
+      const mine=d.fromId===u.id;
+      return `<div style="display:flex;justify-content:${mine?'flex-end':'flex-start'};margin:6px 0">
+        <div style="max-width:75%;padding:8px 12px;border-radius:12px;font-size:14px;word-break:break-word;
+          background:${mine?'var(--accent)':'var(--accent-soft)'};color:${mine?'#fff':'var(--ink)'}">
+          ${esc(d.text)}<div style="font-size:10px;opacity:.7;margin-top:3px">${fmt(d.at)}</div></div></div>`;
+    }).join(''):'<div class="empty">開始你們的第一則訊息吧</div>';
+    convCard=`<div class="card"><h2>與 ${esc(m?m.nick:'(已刪除會員)')} 的對話
+      <button class="btn ghost sm" style="margin:0 0 0 8px" onclick="dmWith=null;render()">關閉</button></h2>
+      <div style="max-height:340px;overflow-y:auto;padding:4px 0">${bubbles}</div>
+      <div class="cmt-form" style="display:flex;gap:8px;margin-top:8px">
+        <input id="dm_input" style="flex:1" placeholder="輸入訊息…" maxlength="500"
+          onkeydown="if(event.key==='Enter')sendDM('${dmWith}')">
+        <button class="btn sm" style="margin:0" onclick="sendDM('${dmWith}')">送出</button></div></div>`;
+  }
+  // 查找暱稱 → 開始新對話
+  const q=dmSearch.trim().toLowerCase();
+  const found=q?DB.users.filter(x=>x.id!==u.id&&String(x.nick).toLowerCase().includes(q)):[];
+  const searchCard=`<div class="card"><h2>查找暱稱 · 開始私訊</h2>
+    <input id="dm_search" class="keepfocus" placeholder="輸入暱稱搜尋會員…" value="${esc(dmSearch)}" oninput="dmSearch=this.value;render()">
+    <div style="margin-top:10px">${
+      q?(found.length?found.map(m=>`<div class="rate-row"><span class="name">${esc(m.nick)}</span>
+        <span style="font-size:12px;color:var(--sub)">積分 ${m.score}</span>
+        <button class="btn sm" style="margin:0" onclick="openDM('${m.id}')">私訊</button></div>`).join('')
+        :'<div class="empty">找不到符合的暱稱</div>')
+      :'<div class="empty" style="padding:16px 0">輸入暱稱來找人開始私訊</div>'
+    }</div></div>`;
+  // 對話列表
+  const pids=[...new Set(dms.map(d=>d.fromId===u.id?d.toId:d.fromId))];
+  const items=pids.map(pid=>{
+    const list=dms.filter(d=>(d.fromId===u.id&&d.toId===pid)||(d.fromId===pid&&d.toId===u.id))
+      .sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+    const last=list[list.length-1];
+    const unread=list.filter(d=>d.toId===u.id&&!d.read).length;
+    const m=userById(pid);
+    return {pid,nick:m?m.nick:'(已刪除會員)',last,unread};
+  }).sort((a,b)=>String(b.last?b.last.at:'').localeCompare(String(a.last?a.last.at:'')));
+  const listCard=`<div class="card"><h2>我的對話</h2>${
+    items.length?items.map(it=>`<div class="rate-row" style="cursor:pointer" onclick="openDM('${it.pid}')">
+      <span class="name">${esc(it.nick)}${it.unread?` <span class="badge b-bad">${it.unread}</span>`:''}</span>
+      <span style="font-size:12px;color:var(--sub);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.last?esc(it.last.text):''}</span>
+      <button class="btn ghost sm" style="margin:0" onclick="event.stopPropagation();openDM('${it.pid}')">開啟</button></div>`).join('')
+      :'<div class="empty">還沒有任何對話,用上方搜尋找人開始吧</div>'
+  }</div>`;
+  return convCard+searchCard+listCard;
+}
+function openDM(pid){ dmWith=pid; dmSearch=''; render(); markDMRead(pid); }
+async function markDMRead(pid){
+  const u=me(); if(!u) return;
+  if(!(DB.dms||[]).some(d=>d.toId===u.id&&d.fromId===pid&&!d.read)) return;
+  try{ await postRaw('readDM',{userId:u.id,otherId:pid}); await loadAll(); }catch(e){}
+}
+async function sendDM(toId){
+  const inp=document.getElementById('dm_input');
+  const text=inp.value.trim();
+  if(!text) return;
+  try{ await api('sendDM',{fromId:PROFILE.id,toId,text}); await loadAll(); }catch(e){}
+}
+function dmTo(pid){ go('dm'); openDM(pid); }
 
 /* ====== 開團 ====== */
 /* 開團表單工具 */
