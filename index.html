@@ -252,6 +252,23 @@ function renderHome(){
     }else if(u&&ev.status==='confirmed'&&joined&&ev.hostId!==u.id&&new Date(ev.time).getTime()>Date.now()){
       action=`<button class="btn ghost sm" onclick="leaveEv('${ev.id}',1)">取消報名(扣10分)</button>`;
     }
+    let delUI='';
+    if(u){
+      const dr=ev.delReq;
+      if(ev.hostId===u.id){
+        if(!dr){
+          delUI=`<div style="margin-top:10px"><button class="btn ghost sm" style="margin:0;color:var(--bad);border-color:var(--bad)" onclick="doDelete('${ev.id}')">🗑️ 解散揪團</button></div>`;
+        }else{
+          delUI=`<div class="notice b-bad" style="background:var(--bad-soft);color:var(--bad)">🗑️ 你已申請解散,需所有團員同意(${dr.agree.length}/${ev.members.length})。
+            <button class="btn ghost sm" style="margin:0 0 0 8px" onclick="voteDel('${ev.id}',false)">取消申請</button></div>`;
+        }
+      }else if(dr&&ev.members.includes(u.id)){
+        const iAgreed=dr.agree.includes(u.id);
+        delUI=`<div class="notice" style="background:var(--bad-soft);color:var(--bad)">🗑️ 主揪申請解散此團(${dr.agree.length}/${ev.members.length} 已同意)。${iAgreed?'你已同意,等待其他人。':`
+          <button class="btn sm" style="margin:0 0 0 8px" onclick="voteDel('${ev.id}',true)">同意解散</button>
+          <button class="btn ghost sm" style="margin:0 0 0 6px" onclick="voteDel('${ev.id}',false)">不同意</button>`}</div>`;
+      }
+    }
     return `<div class="card">
       <div class="ev-head"><div>
         <div class="ev-title">${esc(ev.title)} ${statusBadge(ev)}</div>
@@ -262,6 +279,7 @@ function renderHome(){
       </div><div>${action}</div></div>
       <div class="members">${ev.members.map(id=>{const m=userById(id);
         return m?`<span class="chip ${id===ev.hostId?'host':''}">${esc(m.nick)} ${m.score}分${id===ev.hostId?' 👑':''}</span>`:''}).join('')}</div>
+      ${delUI}
       ${renderComments(ev)}
     </div>`;
   }).join(''):`<div class="empty">目前${filterDate?'這天':''}沒有揪團${filterDate?'':',快去開一團吧!'}</div>`;
@@ -296,6 +314,18 @@ async function joinEv(id){ try{ await api('join',{eventId:id,userId:PROFILE.id})
 async function leaveEv(id,penalty){
   if(penalty&&!confirm('此團已成團,現在取消將扣除 10 分積分,確定要取消嗎?')) return;
   try{ await api('leave',{eventId:id,userId:PROFILE.id}); await loadAll(); }catch(e){}
+}
+async function doDelete(id){
+  if(!confirm('確定要解散此揪團嗎?若已有其他團員參與,需所有團員同意才會刪除。')) return;
+  try{
+    const d=await api('deleteEvent',{eventId:id,userId:PROFILE.id});
+    if(d.pending) alert(`已送出解散申請,需其他 ${d.need} 位團員同意才會刪除。`);
+    await loadAll();
+  }catch(e){}
+}
+async function voteDel(id,agree){
+  if(agree&&!confirm('同意解散此團嗎?')) return;
+  try{ await api('voteDelete',{eventId:id,userId:PROFILE.id,agree}); await loadAll(); }catch(e){}
 }
 
 /* ====== 留言與回覆 ====== */
