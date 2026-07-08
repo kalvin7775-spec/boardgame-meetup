@@ -148,9 +148,13 @@ async function loadAll(){
   try{
     const res=await fetch(API_URL);
     DB=await res.json();
-    if(PROFILE){ try{ const d=await postRaw('getDMs',{userId:PROFILE.id}); DB.dms=d.list||[]; }catch(e){ DB.dms=DB.dms||[]; } }
   }catch(e){ loadError='無法連線到後端,請稍後再試或按重新整理。'; }
   loading=false; loaded=true; render();
+  if(PROFILE) loadDMs(); // 私訊在背景載入,不阻塞首頁顯示
+}
+async function loadDMs(){
+  if(!PROFILE) return;
+  try{ const d=await postRaw('getDMs',{userId:PROFILE.id}); DB.dms=d.list||[]; render(); }catch(e){}
 }
 
 /* ====== 導覽 ====== */
@@ -491,13 +495,13 @@ function openDM(pid){ dmWith=pid; dmSearch=''; render(); markDMRead(pid); }
 async function markDMRead(pid){
   const u=me(); if(!u) return;
   if(!(DB.dms||[]).some(d=>d.toId===u.id&&d.fromId===pid&&!d.read)) return;
-  try{ await postRaw('readDM',{userId:u.id,otherId:pid}); await loadAll(); }catch(e){}
+  try{ await postRaw('readDM',{userId:u.id,otherId:pid}); await loadDMs(); }catch(e){}
 }
 async function sendDM(toId){
   const inp=document.getElementById('dm_input');
   const text=inp.value.trim();
   if(!text) return;
-  try{ await api('sendDM',{fromId:PROFILE.id,toId,text}); await loadAll(); }catch(e){}
+  try{ await api('sendDM',{fromId:PROFILE.id,toId,text}); await loadDMs(); }catch(e){}
 }
 function dmTo(pid){ go('dm'); openDM(pid); }
 
