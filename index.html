@@ -255,7 +255,7 @@ function renderHome(){
     return `<div class="card">
       <div class="ev-head"><div>
         <div class="ev-title">${esc(ev.title)} ${statusBadge(ev)}</div>
-        <div class="meta">🕒 ${fmt(ev.time)}(報名截止 ${fmt(ev.deadline)})<br>
+        <div class="meta">🕒 ${fmt(ev.time)}${ev.duration?`(預計 ${ev.duration} 小時)`:''}(報名截止 ${fmt(ev.deadline)})<br>
         📍 ${ev.region?`<b>[${esc(ev.region)}]</b> `:''}${esc(ev.place)} 🎮 ${esc(ev.games)}<br>
         🎓 教學:${esc(ev.teaching||'—')} 💰 費用:${ev.fee>0?ev.fee+' 元':'免費'}<br>
         👥 ${ev.members.length}/${ev.maxPeople} 人(最低 ${ev.minPeople} 人成團)</div>
@@ -406,6 +406,7 @@ function renderCreate(){
     <div class="row">
       <div><label>活動日期 *(只能選今天以後)</label><input id="c_date" type="date" min="${todayStr}" onchange="updateDeadline()"></div>
       <div><label>活動時間 *(30 分鐘為單位)</label><select id="c_time_sel" onchange="updateDeadline()">${timeOptions()}</select></div>
+      <div><label>預計遊玩時間 *(以小時為單位)</label><input id="c_duration" type="number" min="0.5" step="0.5" value="3" placeholder="例如 3"></div>
       <div><label>報名截止時間 *(自動設為活動前 12 小時,可手動調整)</label><input id="c_deadline" type="datetime-local"></div>
       <div><label>區域 *</label><select id="c_region">
         <option value="">請選擇</option><option>北部</option><option>中部</option><option>南部</option><option>東部</option></select></div>
@@ -421,11 +422,12 @@ function renderCreate(){
 }
 async function doCreate(){
   const cd=$('#c_date').value, ct=$('#c_time_sel').value;
-  const p={title:$('#c_title').value.trim(), time:cd&&ct?`${cd}T${ct}`:'', deadline:$('#c_deadline').value,
+  const p={title:$('#c_title').value.trim(), time:cd&&ct?`${cd}T${ct}`:'', duration:+$('#c_duration').value||0, deadline:$('#c_deadline').value,
         region:$('#c_region').value, place:$('#c_place').value.trim(), games:$('#c_games').value.trim(),
         teaching:$('#c_teaching').value, fee:+$('#c_fee').value||0,
         minPeople:+$('#c_min').value, maxPeople:+$('#c_max').value, hostId:PROFILE.id};
   if(!p.title||!p.time||!p.deadline||!p.region||!p.place||!p.games||!p.teaching||!p.minPeople||!p.maxPeople) return alert('所有欄位皆為必填');
+  if(!(p.duration>0)) return alert('預計遊玩時間請填大於 0 的數字(以小時為單位)');
   if(new Date(p.time).getTime()<=Date.now()) return alert('活動時間必須是現在之後');
   if(new Date(p.deadline).getTime()<=Date.now()) return alert('報名截止時間已過,請調整(活動太接近現在時,請手動設定截止時間)');
   if(!(p.fee>=0)) return alert('費用請填 0 或正整數');
